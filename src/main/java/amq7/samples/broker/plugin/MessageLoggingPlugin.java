@@ -23,7 +23,6 @@ public class MessageLoggingPlugin implements ActiveMQServerPlugin {
     public void afterMessageRoute(Message message, RoutingContext context, boolean direct, boolean rejectDuplicates, RoutingStatus result) throws ActiveMQException {
         ActiveMQServerPlugin.super.afterMessageRoute(message, context, direct, rejectDuplicates, result);
         LOGGER.info("************* After Message Route (IN) *********************");
-        //LOGGER.info(message.toString());
         
         LogUtil.toLog(LOGGER, 
             "IN",
@@ -43,7 +42,6 @@ public class MessageLoggingPlugin implements ActiveMQServerPlugin {
     public void afterDeliver(ServerConsumer consumer, MessageReference reference) throws ActiveMQException {
         ActiveMQServerPlugin.super.afterDeliver(consumer, reference);
         LOGGER.info("************* After Deliver Message (OUT) *********************");
-        //LOGGER.info(reference.toString());
         final Message message = reference.getMessage();
         LogUtil.toLog(LOGGER, 
                       "OUT",
@@ -52,20 +50,21 @@ public class MessageLoggingPlugin implements ActiveMQServerPlugin {
                       message.getAddress(),
                       TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(),
                       message.getConnectionID(),
-                      String.valueOf(message.getUserID()),
+                      String.valueOf(message),
                       message.getStringProperty("_AMQ_ROUTE_TO"),
-                      this.extractAllProps(message)
-                      );
+                      this.extractAllProps(message));
     }
     
     private String extractAllProps(final Message message) {
         final StringBuffer sb = new StringBuffer();
 
-        for (SimpleString item : message.getPropertyNames()) {
-            sb.append(item.toString());
-            sb.append("=");
-            sb.append(message.getStringProperty(item));
-            sb.append(", ");
+        if (message.getPropertyNames() != null) {
+            for (SimpleString item : message.getPropertyNames()) {
+                sb.append(item.toString());
+                sb.append("=");
+                sb.append(message.getStringProperty(item));
+                sb.append(", ");
+            }
         }
 
         return sb.toString();
