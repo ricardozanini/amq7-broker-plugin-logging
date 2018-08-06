@@ -7,7 +7,9 @@ import org.apache.activemq.artemis.core.postoffice.RoutingStatus;
 import org.apache.activemq.artemis.core.server.MessageReference;
 import org.apache.activemq.artemis.core.server.RoutingContext;
 import org.apache.activemq.artemis.core.server.ServerConsumer;
+import org.apache.activemq.artemis.core.server.ServerSession;
 import org.apache.activemq.artemis.core.server.plugin.ActiveMQServerPlugin;
+import org.apache.activemq.artemis.core.transaction.Transaction;
 import org.apache.activemq.artemis.reader.TextMessageUtil;
 import org.jboss.logging.Logger;
 
@@ -37,6 +39,21 @@ public class MessageLoggingPlugin implements ActiveMQServerPlugin {
             );
     }
     
+    @Override
+    public void afterSend(ServerSession session, Transaction tx, Message message, boolean direct, boolean noAutoCreateQueue, RoutingStatus result) throws ActiveMQException {
+        ActiveMQServerPlugin.super.afterSend(session, tx, message, direct, noAutoCreateQueue, result);
+        LOGGER.info("************* After Send Message (OUT) *********************");
+        LogUtil.toLog(LOGGER, 
+                      "OUT",
+                      String.valueOf(message.getMessageID()),
+                      message.getStringProperty("JMSCorrelationID"), 
+                      message.getAddress(),
+                      TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(),
+                      message.getConnectionID(),
+                      String.valueOf(message),
+                      message.getStringProperty("_AMQ_ROUTE_TO"),
+                      this.extractAllProps(message));
+    }
 
     @Override
     public void afterDeliver(ServerConsumer consumer, MessageReference reference) throws ActiveMQException {
