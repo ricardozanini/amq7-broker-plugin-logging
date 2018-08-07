@@ -54,7 +54,8 @@ public class MessageLoggingPlugin implements ActiveMQServerPlugin {
             return; // we're not interested in ACK
         }
 
-        LOGGER.info("************* After deliver (" + reference.getDeliveryCount() + ") Message (OUT) *********************");
+        LOGGER.info("****** OUT DETAILS ******");
+        LOGGER.info("Redelivery #" + reference.getDeliveryCount());
 
         LogUtil.toLog(LOGGER, "OUT", String.valueOf(message.getMessageID()), message.getStringProperty("JMSCorrelationID"), message.getAddress(),
                       TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(), message.getConnectionID(), String.valueOf(message.getUserID()),
@@ -71,26 +72,11 @@ public class MessageLoggingPlugin implements ActiveMQServerPlugin {
         if (isFromBlacklistAddress(message)) {
             return;
         }
+        LOGGER.info("****** ROUTE DETAILS ******");
+        LogUtil.toLog(LOGGER, "ROUTE", String.valueOf(message.getMessageID()), message.getStringProperty("JMSCorrelationID"), message.getAddress(),
+                      TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(), message.getConnectionID(), String.valueOf(message.getUserID()),
+                      message.getStringProperty("_AMQ_ROUTE_TO"), this.extractAllProps(message));
 
-        message.putBooleanProperty("_MyCustomBrokerPlugin_MessageWasRouted", true);
-        /*
-         * LogUtil.toLog(LOGGER, "ROUTE", String.valueOf(message.getMessageID()), message.getStringProperty("JMSCorrelationID"), message.getAddress(),
-         * TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(), message.getConnectionID(), String.valueOf(message.getUserID()), message.getStringProperty("_AMQ_ROUTE_TO"),
-         * this.extractAllProps(message));
-         */
-    }
-
-    @Override
-    public void beforeSend(ServerSession session, Transaction tx, Message message, boolean direct, boolean noAutoCreateQueue) throws ActiveMQException {
-        if (isFromBlacklistAddress(message)) {
-            return;
-        }
-
-        // it's a new message arriving to broker cluster
-        if (message.getMessageID() == 0)
-            message.putBooleanProperty("_MyCustomBrokerPlugin_isNewMessage", true);
-        else
-            message.putBooleanProperty("_MyCustomBrokerPlugin_isNewMessage", false);
     }
 
     /**
@@ -106,16 +92,13 @@ public class MessageLoggingPlugin implements ActiveMQServerPlugin {
             return;
         }
 
+        LOGGER.info("****** IN DETAILS ******");
+        LOGGER.info("Connection details RemoteAddress: " + session.getRemotingConnection().getRemoteAddress());
+        LOGGER.info("Connection details ClientID: " + session.getRemotingConnection().getClientID());
+        
         LogUtil.toLog(LOGGER, "IN", String.valueOf(message.getMessageID()), message.getStringProperty("JMSCorrelationID"), message.getAddress(),
                       TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(), message.getConnectionID(), String.valueOf(message.getUserID()),
                       message.getStringProperty("_AMQ_ROUTE_TO"), this.extractAllProps(message));
-
-        // delaying the route message for consistency logging.
-        if (message.getBooleanProperty("_MyCustomBrokerPlugin_MessageWasRouted") && message.getBooleanProperty("_MyCustomBrokerPlugin_isNewMessage")) {
-            LogUtil.toLog(LOGGER, "OUT", String.valueOf(message.getMessageID()), message.getStringProperty("JMSCorrelationID"), message.getAddress(),
-                          TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(), message.getConnectionID(), String.valueOf(message.getUserID()),
-                          message.getStringProperty("_AMQ_ROUTE_TO"), this.extractAllProps(message));
-        }
 
     }
 
