@@ -81,7 +81,8 @@ public class MessageLoggingPlugin implements ActiveMQServerPlugin {
         }
         
         LOGGER.info("************* After Message Route (ROUTE) *********************");
-        
+        LOGGER.info("************* Route result: " + result + " *********************");
+        LOGGER.info("************* Direct: " + direct + " *********************");
         LogUtil.toLog(LOGGER, "ROUTE", String.valueOf(message.getMessageID()), message.getStringProperty("JMSCorrelationID"), message.getAddress(),
                       TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(), message.getConnectionID(), String.valueOf(message.getUserID()),
                       message.getStringProperty("_AMQ_ROUTE_TO"), this.extractAllProps(message));
