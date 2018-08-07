@@ -1,5 +1,9 @@
 package amq7.samples.broker.plugin;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.Message;
 import org.apache.activemq.artemis.api.core.SimpleString;
@@ -14,64 +18,97 @@ import org.apache.activemq.artemis.reader.TextMessageUtil;
 import org.jboss.logging.Logger;
 
 public class MessageLoggingPlugin implements ActiveMQServerPlugin {
-    
+
     private static final Logger LOGGER = Logger.getLogger(MessageLoggingPlugin.class);
 
+    // messages from queues we don't want to log.
+    private Set<String> blackList = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(new String[] { "activemq.notifications"})));
+
     public MessageLoggingPlugin() {
+
+    }
+
+    /**
+     * Logs information when message is delivered to a consumer and when a message is acknowledged by a consumer.
+     */
+    @Override
+    public void afterDeliver(ServerConsumer consumer, MessageReference reference) throws ActiveMQException {
+        if (reference == null) {
+            LOGGER.info("************* (OUT) MessageReference is null *****************");
+            return;
+        }
+
+        if (reference.getMessage() == null) {
+            LOGGER.info("************* (OUT) Message from MessageReference is null *****************");
+            return;
+        }
+
+        final Message message = reference.getMessage();
+        if (blackList.contains((message == null ? "" : message.getAddress()))) {
+            LOGGER.info("************* (OUT) Message in blacklist *****************");
+            return;
+        }
+
+        if (consumer == null) {
+            LOGGER.info("************* (OUT) No consumer *****************");
+            return; // no consumer, message not out yet
+        }
+
+        if (reference.isAlreadyAcked()) {
+            LOGGER.info("************* (OUT) Message ACK *****************");
+            return; // we're not interested in ACK
+        }
         
+        
+        LOGGER.info("************* After deliver (" +  reference.getDeliveryCount() + ") Message (OUT) *********************");
+
+        LogUtil.toLog(LOGGER, "OUT", String.valueOf(message.getMessageID()), message.getStringProperty("JMSCorrelationID"), message.getAddress(),
+                      TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(), message.getConnectionID(), String.valueOf(message.getUserID()),
+                      message.getStringProperty("_AMQ_ROUTE_TO"), this.extractAllProps(message));
+
     }
     
     @Override
     public void afterMessageRoute(Message message, RoutingContext context, boolean direct, boolean rejectDuplicates, RoutingStatus result) throws ActiveMQException {
-        ActiveMQServerPlugin.super.afterMessageRoute(message, context, direct, rejectDuplicates, result);
-        LOGGER.info("************* After Message Route (IN) *********************");
+        if(message == null) {
+            LOGGER.info("************* (ROUTE) Message is null *****************");
+            return;
+        }
         
-        LogUtil.toLog(LOGGER, 
-            "IN",
-            String.valueOf(message.getMessageID()),
-            message.getStringProperty("JMSCorrelationID"), 
-            message.getAddress(),
-            TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(),
-            message.getConnectionID(),
-            String.valueOf(message.getUserID()),
-            message.getStringProperty("_AMQ_ROUTE_TO"),
-            this.extractAllProps(message)
-            );
+        if (blackList.contains((message == null ? "" : message.getAddress()))) {
+            LOGGER.info("************* (ROUTE) Message in blacklist *****************");
+            return;
+        }
+        
+        LOGGER.info("************* After Message Route (ROUTE) *********************");
+        
+        LogUtil.toLog(LOGGER, "ROUTE", String.valueOf(message.getMessageID()), message.getStringProperty("JMSCorrelationID"), message.getAddress(),
+                      TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(), message.getConnectionID(), String.valueOf(message.getUserID()),
+                      message.getStringProperty("_AMQ_ROUTE_TO"), this.extractAllProps(message));
     }
-    
+
+    /**
+     * Logs information when a message has been sent to an address and when a message has been routed within the broker.
+     */
     @Override
     public void afterSend(ServerSession session, Transaction tx, Message message, boolean direct, boolean noAutoCreateQueue, RoutingStatus result) throws ActiveMQException {
-        ActiveMQServerPlugin.super.afterSend(session, tx, message, direct, noAutoCreateQueue, result);
-        LOGGER.info("************* After Send Message (OUT) *********************");
-        LogUtil.toLog(LOGGER, 
-                      "OUT",
-                      String.valueOf(message.getMessageID()),
-                      message.getStringProperty("JMSCorrelationID"), 
-                      message.getAddress(),
-                      TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(),
-                      message.getConnectionID(),
-                      String.valueOf(message),
-                      message.getStringProperty("_AMQ_ROUTE_TO"),
+        if (message == null) {
+            LOGGER.info("************* (IN) Message is null *****************");
+            return;
+        }
+
+        if (blackList.contains((message == null ? "" : message.getAddress()))) {
+            LOGGER.info("************* (IN) Message in blacklist *****************");
+            return;
+        }
+
+        LOGGER.info("************* After Send Message (IN) *********************");
+
+        LogUtil.toLog(LOGGER, "IN", String.valueOf(message.getMessageID()), message.getStringProperty("JMSCorrelationID"), message.getAddress(),
+                      TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(), message.getConnectionID(), String.valueOf(message.getUserID()), message.getStringProperty("_AMQ_ROUTE_TO"),
                       this.extractAllProps(message));
     }
 
-    @Override
-    public void afterDeliver(ServerConsumer consumer, MessageReference reference) throws ActiveMQException {
-        ActiveMQServerPlugin.super.afterDeliver(consumer, reference);
-        LOGGER.info("************* After Deliver Message (OUT) *********************");
-        final Message message = reference.getMessage();
-        LogUtil.toLog(LOGGER, 
-                      "OUT",
-                      String.valueOf(message.getMessageID()),
-                      message.getStringProperty("JMSCorrelationID"), 
-                      message.getAddress(),
-                      TextMessageUtil.readBodyText(message.toCore().getBodyBuffer()).toString(),
-                      message.getConnectionID(),
-                      String.valueOf(message),
-                      message.getStringProperty("_AMQ_ROUTE_TO"),
-                      this.extractAllProps(message));
-    }
-    
     private String extractAllProps(final Message message) {
         final StringBuffer sb = new StringBuffer();
 
